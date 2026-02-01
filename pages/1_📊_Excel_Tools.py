@@ -332,107 +332,85 @@ def tạo_excel_mẫu():
 
 # --- GIAO DIỆN TAB 3: TRỘN HỒ SƠ & HỢP ĐỒNG ---
 with tabs[2]:
-    st.header("🎭 Trộn Hồ Sơ & Hợp Đồng Chuyên Nghiệp")
+    st.header("🎭 Trộn Hồ Sơ Chuyên Nghiệp (V5)")
     
-    # 1. Khu vực Tải mẫu hệ thống
-    st.subheader("📁 Bước 1: Tải file mẫu từ hệ thống")
-    col_dl1, col_dl2, col_dl3 = st.columns(3)
+    # --- PHẦN 1: TẢI FILE ĐẦU VÀO ---
+    st.subheader("📁 Bước 1: Tải dữ liệu và Mẫu Word")
+    col_upload_ex, col_upload_wd = st.columns(2)
     
-    with col_dl1:
-        st.download_button(
-            label="📊 TẢI EXCEL NHẬP LIỆU",
-            data=tạo_excel_mẫu(),
-            file_name="1_Mau_Excel_Nhap_Lieu.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+    with col_upload_ex:
+        uploaded_excel = st.file_uploader("📂 Tải file Excel dữ liệu", type=["xlsx", "xls"])
+        st.download_button("📥 Tải Excel mẫu (nếu chưa có)", tạo_excel_mẫu(), "Mau_Excel.xlsx")
         
-    with col_dl2:
-        st.download_button(
-            label="📄 TẢI MẪU GIẤY MỜI",
-            data=tao_file_word_mau_giay_moi(),
-            file_name="2_Mau_Giay_Moi_Su_Kien.docx",
-            use_container_width=True
-        )
-        
-    with col_dl3:
-        st.download_button(
-            label="📝 TẢI MẪU HỢP ĐỒNG",
-            data=tao_file_word_mau_hop_dong(),
-            file_name="3_Mau_Hop_Dong_Lao_Dong.docx",
-            use_container_width=True
-        )
+    with col_upload_wd:
+        uploaded_word = st.file_uploader("📂 Tải file Word mẫu ({{ }})", type=["docx"])
+        st.download_button("📥 Tải Word mẫu (nếu chưa có)", tao_file_word_mau_giay_moi(), "Mau_Giay_Moi.docx")
 
+    # Đọc dữ liệu từ Excel vào DataFrame nếu có file tải lên
+    if uploaded_excel:
+        st.session_state.df_merge = pd.read_excel(uploaded_excel)
+    
     st.divider()
 
-    # 2. Khu vực Upload và Nhập liệu
-    st.subheader("🚀 Bước 2: Tải file Word mẫu & Nhập dữ liệu")
-    c1, c2 = st.columns(2)
-    with c1:
-        word_template = st.file_uploader("📂 Tải file Word mẫu của bạn (đã đặt {{ }} )", type=["docx"], key="w_tpl_final")
-    with c2:
-        st.info("💡 **Mẹo:** Bạn có thể dán (Ctrl+V) dữ liệu trực tiếp từ Excel vào bảng bên dưới. Chữ đã được chỉnh màu đen đậm để dễ kiểm tra.")
-
-    # Danh sách cột yêu cầu
-    cột_yêu_cầu = [
-        "So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", 
-        "ThoiGian", "DiaDiem", "NgayCap", "LuongMoi", "LuongCu", 
-        "NgayHieuLuc", "MaNV", "Phongban"
-    ]
+    # --- PHẦN 2: BẢNG CHỈNH SỬA DỮ LIỆU ---
+    st.subheader("📝 Bước 2: Kiểm tra & Chỉnh sửa dữ liệu")
+    st.write("*(Chữ đen đậm, bạn có thể sửa trực tiếp hoặc dán thêm dòng)*")
     
-    if 'df_merge' not in st.session_state:
-        st.session_state.df_merge = pd.DataFrame(columns=cột_yêu_cầu)
-
-    # 3. Bảng nhập liệu (Data Editor) với cấu hình chữ đen đậm
-    st.write("📝 **Bảng dữ liệu nhập liệu (Chữ đen đậm):**")
+    # Cấu hình bảng chữ đen đậm
+    config_cols = {col: st.column_config.TextColumn(label=f"**{col}**") for col in st.session_state.df_merge.columns}
     
-    # Cấu hình làm đậm tiêu đề cột
-    config_cols = {col: st.column_config.TextColumn(label=f"**{col}**", width="medium") for col in cột_yêu_cầu}
-
     edited_df = st.data_editor(
         st.session_state.df_merge, 
         num_rows="dynamic", 
         use_container_width=True,
         column_config=config_cols,
-        key="pro_editor_high_contrast"
+        key="editor_v5"
     )
 
-    # 4. Xử lý trộn file và xuất ZIP
-    if st.button("🚀 BẮT ĐẦU XUẤT HÀNG LOẠT (.ZIP)", use_container_width=True):
-        if word_template and not edited_df.empty:
+    st.divider()
+
+    # --- PHẦN 3: LỰA CHỌN XUẤT FILE ---
+    st.subheader("🚀 Bước 3: Lựa chọn kiểu xuất bản")
+    
+    if not edited_df.empty and uploaded_word:
+        mode = st.radio("Chọn hình thức kết xuất:", 
+                        ["📦 Xuất các file Word lẻ (Nén trong .ZIP)", 
+                         "📄 Gộp tất cả vào 1 file Word duy nhất"])
+        
+        if st.button("🔥 BẮT ĐẦU XỬ LÝ"):
+            all_docs = []
             try:
-                zip_buffer = BytesIO()
-                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                    for index, row in edited_df.iterrows():
-                        doc = DocxTemplate(word_template)
-                        context = row.to_dict()
-                        
-                        # Tự động chuyển đổi số tiền thành chữ (nếu có cột Luong hoặc LuongMoi)
-                        if "LuongMoi" in context and context["LuongMoi"]:
-                            context["LuongMoiChu"] = doc_so_thanh_chu_logic(str(context["LuongMoi"]))
-                        if "Luong" in context and context["Luong"]:
-                            context["LuongChu"] = doc_so_thanh_chu_logic(str(context["Luong"]))
-                        
-                        doc.render(context)
-                        out_word = BytesIO()
-                        doc.save(out_word)
-                        
-                        # Đặt tên file theo Tên hoặc Số
-                        fname = str(row.get('Ten', row.get('So', f'File_{index+1}'))).strip().replace(' ', '_')
-                        zip_file.writestr(f"{fname}.docx", out_word.getvalue())
+                # Tiến hành trộn dữ liệu
+                for index, row in edited_df.iterrows():
+                    doc = DocxTemplate(uploaded_word)
+                    context = row.to_dict()
+                    
+                    # Logic đọc số tiền (nếu có)
+                    if "LuongMoi" in context: context["LuongMoiChu"] = doc_so_thanh_chu_logic(str(context["LuongMoi"]))
+                    
+                    doc.render(context)
+                    out_word = BytesIO()
+                    doc.save(out_word)
+                    all_docs.append({'data': out_word.getvalue(), 'name': str(row.get('Ten', f'File_{index+1}'))})
+
+                # Trả kết quả theo lựa chọn
+                if "lẻ" in mode:
+                    zip_buffer = BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                        for d in all_docs:
+                            zip_file.writestr(f"{d['name'].replace(' ', '_')}.docx", d['data'])
+                    st.success("✅ Đã tạo xong bộ file lẻ!")
+                    st.download_button("📥 TẢI FILE .ZIP", zip_buffer.getvalue(), "Ket_Qua_Le.zip", use_container_width=True)
                 
-                st.success(f"✅ Đã xử lý thành công {len(edited_df)} tài liệu!")
-                st.download_button(
-                    "📥 TẢI KẾT QUẢ (.ZIP)", 
-                    zip_buffer.getvalue(), 
-                    "Ket_Qua_Tron_Ho_So.zip", 
-                    "application/zip",
-                    use_container_width=True
-                )
+                else:
+                    merged_data = gop_cac_file_word([d['data'] for d in all_docs])
+                    st.success("✅ Đã gộp thành công vào 1 file duy nhất!")
+                    st.download_button("📥 TẢI FILE WORD TỔNG", merged_data, "Ket_Qua_Tong_Hop.docx", use_container_width=True)
+                    
             except Exception as e:
-                st.error(f"❌ Lỗi xử lý: {e}")
-        else:
-            st.warning("⚠️ Vui lòng cung cấp file Word mẫu và nhập dữ liệu vào bảng!")
+                st.error(f"❌ Lỗi: {e}")
+    else:
+        st.warning("⚠️ Vui lòng tải đủ file Excel và Word để bắt đầu.")
 
 with tabs[3]: st.write("Chức năng đang phát triển...")
 with tabs[4]: st.write("Chức năng đang phát triển...")
