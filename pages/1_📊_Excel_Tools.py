@@ -18,6 +18,17 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 from docx import Document as DocxDocument # Để tránh trùng tên nếu cần
 
+# --- KHỞI TẠO DỮ LIỆU GỐC ---
+cột_yêu_cầu = [
+    "So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", 
+    "ThoiGian", "DiaDiem", "NgayCap", "LuongMoi", "LuongCu", 
+    "NgayHieuLuc", "MaNV", "Phongban"
+]
+
+# Đảm bảo df_merge luôn tồn tại để tránh AttributeError
+if 'df_merge' not in st.session_state:
+    st.session_state.df_merge = pd.DataFrame(columns=cột_yêu_cầu)
+
 def gop_cac_file_word(list_docx_streams):
     # Tạo một file word mới dựa trên file đầu tiên
     merged_document = DocxDocument(BytesIO(list_docx_streams[0]))
