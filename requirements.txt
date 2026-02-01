@@ -3,3 +3,5 @@ pandas
 google-generativeai
 xlsxwriter
 openpyxl
+python-docx
+PyPDF2
