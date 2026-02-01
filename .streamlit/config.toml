@@ -1,1 +1,20 @@
+[theme]
+# Màu chủ đạo (Nút bấm, thanh trượt, các mục active)
+primaryColor = "#745af2"
 
+# Màu nền của khu vực làm việc (Trắng sạch sẽ)
+backgroundColor = "#ffffff"
+
+# Màu nền của Sidebar (Tím đậm chuyên nghiệp)
+secondaryBackgroundColor = "#404e67"
+
+# Màu chữ chính
+textColor = "#334155"
+
+# Font chữ (Chọn font không chân hiện đại)
+font = "sans serif"
+
+[server]
+# Cấu hình để nhúng vào Blogspot mượt mà hơn
+enableCORS = false
+enableXsrfProtection = false
