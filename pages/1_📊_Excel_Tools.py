@@ -74,7 +74,7 @@ def chuan_hoa_excel_pro(df):
     return output.getvalue()
 
 # --- GIAO DIỆN ---
-st.title("🚀 SMART TOOLS HUB - CHUYÊN GIA DỮ LIỆU")
+st.title("CHUẨN HOÁ DỮ LIỆU EXCEL")
 st.divider()
 
 tabs = st.tabs(["📊 Chuẩn hoá Excel", "📍 Tách Địa Chỉ", "👤 Tách Họ Tên", "💰 Đọc Số Tiền", "📧 Check Email"])
