@@ -13,11 +13,15 @@ st.set_page_config(page_title="Smart Tools Hub - Pro", layout="wide")
 
 st.markdown("""
     <style>
+    /* 1. Nền tổng thể và Sidebar */
     .stApp { background-color: #f1f5f9; }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #745af2 0%, #01caf1 100%); }
     [data-testid="stSidebarNav"] ul li div a span { color: white !important; font-size: 18px !important; font-weight: bold !important; }
+    
+    /* 2. Nút bấm */
     div.stButton > button { border-radius: 8px; font-weight: 600; background-color: #745af2; color: white; border: none; width: 100%; }
 
+    /* 3. Khung Upload File (Giữ màu trắng cho tiêu đề để nổi trên nền xám) */
     [data-testid="stFileUploader"] {
         background-color: #bdc3c7 !important;
         border: 2px dashed #ffffff;
@@ -26,6 +30,21 @@ st.markdown("""
     }
     [data-testid="stFileUploader"] section div div { color: white !important; }
     [data-testid="stFileUploader"] svg { fill: white !important; }
+
+    /* 4. CHỮ TRONG BẢNG NHẬP LIỆU (Ép màu đen đậm) */
+    /* Màu chữ trong các ô */
+    [data-testid="stDataEditor"] div[data-testid="stTable"] td, 
+    [data-testid="stDataEditor"] input {
+        color: #000000 !important;
+        font-weight: 500 !important;
+    }
+    /* Màu chữ tiêu đề cột trong bảng */
+    [data-testid="stDataEditor"] div[role="columnheader"] p {
+        color: #000000 !important;
+        font-weight: bold !important;
+    }
+
+    /* 5. Tab menu */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p { font-size: 16px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
@@ -147,22 +166,7 @@ def tạo_excel_mẫu():
             
     return output.getvalue()
 
-# --- CẬP NHẬT CSS ĐỂ CHỮ TRONG BẢNG RÕ NÉT HƠN ---
-st.markdown("""
-    <style>
-    /* Ép chữ trong các ô nhập liệu của bảng thành màu đen */
-    div[data-testid="stTable"] td, div[data-testid="stDataEditor"] td {
-        color: #000000 !important;
-        font-weight: 500;
-    }
-    /* Làm đậm tiêu đề cột */
-    div[data-testid="stDataEditor"] th {
-        background-color: #f8f9fa !important;
-        color: #000000 !important;
-        font-weight: bold !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+
 
 # --- TRONG PHẦN TAB 3 ---
 with tabs[2]:
