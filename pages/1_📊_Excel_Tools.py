@@ -1,15 +1,14 @@
 import streamlit as st
 import pandas as pd
-import google.generativeai as genai
 import re
 from io import BytesIO
 import docx
 import PyPDF2
+import difflib
 
-# 1. Cấu hình ban đầu
+# 1. CẤU HÌNH GIAO DIỆN
 st.set_page_config(page_title="Smart Tools Hub - Pro", layout="wide")
 
-# CSS Tùy chỉnh Giao diện (Xám nhạt cho Uploader, Chữ trắng)
 st.markdown("""
     <style>
     .stApp { background-color: #f1f5f9; }
@@ -30,24 +29,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Kết nối AI với xử lý lỗi NotFound
-if "GEMINI_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_KEY"])
-    # SỬA LỖI: Sử dụng định danh đầy đủ 'models/gemini-1.5-flash'
-    try:
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
-    except Exception as e:
-        st.error(f"Lỗi khởi tạo Model: {e}")
-        st.stop()
-else:
-    st.error("Chưa cấu hình API Key trong Secrets!")
-    st.stop()
-
 if st.sidebar.button("🏠 VỀ DASHBOARD TỔNG"):
     st.switch_page("app.py")
 
-# --- CÁC HÀM XỬ LÝ DỮ LIỆU ---
-
+# --- HÀM XỬ LÝ ĐỌC FILE ---
 def read_file_content(uploaded_file):
     if uploaded_file is None: return ""
     try:
@@ -61,11 +46,13 @@ def read_file_content(uploaded_file):
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
             return "".join([page.extract_text() for page in pdf_reader.pages])
         elif suffix in ['xlsx', 'xls']:
-            return pd.read_excel(uploaded_file).to_string()
+            df = pd.read_excel(uploaded_file)
+            return df.to_string()
     except Exception as e:
         return f"Lỗi đọc file: {e}"
     return ""
 
+# --- HÀM CHUẨN HÓA EXCEL ---
 def chuan_hoa_excel_pro(df):
     df_clean = df.copy()
     for col in df_clean.columns:
@@ -85,65 +72,29 @@ def chuan_hoa_excel_pro(df):
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_clean.to_excel(writer, index=False, sheet_name='Data_Da_Chuan_Hoa')
+        df_clean.to_excel(writer, index=False, sheet_name='Clean_Data')
         workbook = writer.book
-        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#745af2', 'font_color': 'white', 'border': 1, 'font_name': 'Arial'})
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#745af2', 'font_color': 'white', 'border': 1, 'font_name': 'Arial', 'align': 'center'})
         cell_fmt = workbook.add_format({'border': 1, 'font_name': 'Arial', 'font_size': 11})
         for col_num, value in enumerate(df_clean.columns.values):
-            writer.sheets['Data_Da_Chuan_Hoa'].write(0, col_num, value, header_fmt)
-            writer.sheets['Data_Da_Chuan_Hoa'].set_column(col_num, col_num, 20, cell_fmt)
+            writer.sheets['Clean_Data'].write(0, col_num, value, header_fmt)
+            writer.sheets['Clean_Data'].set_column(col_num, col_num, 25, cell_fmt)
     return output.getvalue()
 
 # --- GIAO DIỆN CHÍNH ---
-st.title("🚀 SMART TOOLS HUB - PHIÊN BẢN CHUYÊN NGHIỆP")
+st.title("🚀 SMART TOOLS HUB - EXCEL & DOC PRO")
 st.divider()
 
-tabs = st.tabs(["📊 Chuẩn hoá Excel", "🔍 So sánh tài liệu", "👤 Tách Họ Tên", "💰 Đọc Số Tiền", "📧 Check Email"])
+tabs = st.tabs(["📊 Chuẩn hoá Excel", "🔍 So sánh đối soát", "👤 Tách Họ Tên", "💰 Đọc Số Tiền", "📧 Check Email"])
 
-# --- TAB 1: CHUẨN HOÁ EXCEL ---
+# TAB 1: CHUẨN HÓA EXCEL
 with tabs[0]:
     st.header("📊 Chuẩn hoá Dữ liệu Excel")
-    st.info("💡 Hệ thống tự động: Sửa Họ tên, Ngày tháng, Số điện thoại. Định dạng Font Arial + Bảng biểu.")
-    uploaded_file = st.file_uploader("Kéo thả file Excel tại đây", type=["xlsx"], key="excel_main")
-    if uploaded_file:
-        df = pd.read_excel(uploaded_file)
+    file_ex = st.file_uploader("Kéo thả file Excel tại đây", type=["xlsx"], key="excel_tab")
+    if file_ex:
+        df = pd.read_excel(file_ex)
         st.dataframe(df.head(10), use_container_width=True)
-        if st.button("✨ BẮT ĐẦU CHUẨN HOÁ", key="btn_excel"):
-            with st.spinner('Đang xử lý...'):
-                res = chuan_hoa_excel_pro(df)
-                st.success("✅ Thành công!")
-                st.download_button("📥 TẢI FILE KẾT QUẢ", res, f"Cleaned_{uploaded_file.name}")
-
-# --- TAB 2: SO SÁNH VĂN BẢN ---
-with tabs[1]:
-    st.header("🔍 So Sánh Tài Liệu AI")
-    st.info("So sánh nội dung giữa 2 file: PDF, Word, Excel, Text. AI sẽ chỉ ra các thay đổi chính.")
-    c1, c2 = st.columns(2)
-    with c1: f_a = st.file_uploader("Tài liệu Gốc (A)", type=["pdf", "docx", "txt", "xlsx"], key="fa")
-    with c2: f_b = st.file_uploader("Tài liệu Mới (B)", type=["pdf", "docx", "txt", "xlsx"], key="fb")
-    
-    if st.button("🚀 BẮT ĐẦU ĐỐI CHIẾU"):
-        if f_a and f_b:
-            with st.spinner('AI đang đọc và phân tích...'):
-                try:
-                    t_a = read_file_content(f_a)
-                    t_b = read_file_content(f_b)
-                    
-                    # Prompt tối ưu hóa để tránh lỗi token và NotFound
-                    prompt = f"""Bạn là một chuyên gia đối soát văn bản. Hãy liệt kê các điểm KHÁC BIỆT giữa Bản A và Bản B sau đây.
-                    Trình bày theo dạng danh sách gạch đầu dòng rõ ràng.
-                    
-                    Bản A: {t_a[:2000]}
-                    ---
-                    Bản B: {t_b[:2000]}"""
-                    
-                    response = model.generate_content(prompt)
-                    st.success("✅ Kết quả phân tích:")
-                    st.markdown(response.text)
-                except Exception as e:
-                    st.error(f"❌ Lỗi AI: {e}")
-                    st.info("Gợi ý: Kiểm tra lại API Key hoặc giảm dung lượng file.")
-        else:
-            st.warning("Vui lòng tải lên cả 2 bản A và B để so sánh!")
-
-# (Giữ các Tab còn lại để dự phòng)
+        if st.button("✨ BẮT ĐẦU CHUẨN HOÁ"):
+            res = chuan_hoa_excel_pro(df)
+            st.success("✅ Đã hoàn thành chuẩn hóa và định dạng!")
+            st.download_button("📥 TẢI FILE
