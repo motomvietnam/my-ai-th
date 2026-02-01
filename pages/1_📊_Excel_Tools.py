@@ -202,50 +202,40 @@ def tạo_excel_mẫu():
             
     return output.getvalue()
 
-# --- TAB 3: MAIL MERGE PRO ---
+# --- GIAO DIỆN TAB 3 ---
 with tabs[2]:
     st.header("🎭 Trộn Hồ Sơ & Hợp Đồng Chuyên Nghiệp")
     
-    # 1. KHU VỰC TẢI MẪU HỆ THỐNG
-    st.subheader("📁 Bước 1: Tải file mẫu từ hệ thống")
-    col_dl1, col_dl2, col_dl3 = st.columns(3)
+    # Khu vực hướng dẫn & Tải mẫu
+    col_guide, col_download = st.columns([2, 1])
+    with col_guide:
+        st.markdown("""
+        **Quy trình sử dụng:**
+        1. Tải **File Excel Mẫu** về và điền thông tin (hoặc dán vào bảng dưới).
+        2. Tải **File Word Mẫu** lên (các từ khóa phải nằm trong `{{ }}`).
+        3. Nhấn **Xuất Zip** để nhận kết quả.
+        """)
     
-    with col_dl1:
+    with col_download:
+        excel_mẫu = tạo_excel_mẫu()
         st.download_button(
-            label="📊 TẢI EXCEL NHẬP LIỆU",
-            data=tạo_excel_mẫu(),
-            file_name="1_Mau_Excel_Data.xlsx",
+            label="📥 TẢI FILE EXCEL MẪU",
+            data=excel_mẫu,
+            file_name="Mau_nhap_lieu_SmartTools.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
-        
-    with col_dl2:
-        st.download_button(
-            label="📄 TẢI MẪU GIẤY MỜI",
-            data=tao_file_word_mau_giay_moi(),
-            file_name="2_Mau_Giay_Moi.docx",
-            use_container_width=True
-        )
-        
-    with col_dl3:
-        st.download_button(
-            label="📝 TẢI MẪU HỢP ĐỒNG",
-            data=tao_file_word_mau_hop_dong(),
-            file_name="3_Mau_Hop_Dong.docx",
             use_container_width=True
         )
 
     st.divider()
 
-    # 2. KHU VỰC TẢI LÊN VÀ NHẬP LIỆU
-    st.subheader("🚀 Bước 2: Tải file Word của bạn & Nhập dữ liệu")
+    # Khu vực nhập liệu chính
     c1, c2 = st.columns(2)
     with c1:
-        word_template = st.file_uploader("📂 Tải file Word mẫu (Chứa {{ từ khóa }})", type=["docx"], key="w_tpl_v4")
+        word_template = st.file_uploader("📂 Tải file Word mẫu", type=["docx"], key="w_tpl")
     with c2:
-        st.info("💡 **Mẹo:** Bạn có thể dán (Ctrl+V) dữ liệu trực tiếp từ Excel vào bảng phía dưới để xử lý nhanh.")
+        st.info("💡 Bạn có thể dán (Ctrl+V) dữ liệu trực tiếp vào bảng phía dưới.")
 
-    # Cấu hình các cột hiển thị đậm và rõ nét
+    # Khởi tạo bảng nhập liệu với đúng các cột yêu cầu
     cột_yêu_cầu = [
         "So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", 
         "ThoiGian", "DiaDiem", "NgayCap", "LuongMoi", "LuongCu", 
@@ -255,56 +245,42 @@ with tabs[2]:
     if 'df_merge' not in st.session_state:
         st.session_state.df_merge = pd.DataFrame(columns=cột_yêu_cầu)
 
-    # Bảng nhập liệu với định dạng chữ đen đậm
-    st.write("📝 **Bảng dữ liệu trộn (Chữ đen đậm):**")
+    # Bảng nhập liệu thông minh (Data Editor)
     edited_df = st.data_editor(
         st.session_state.df_merge, 
         num_rows="dynamic", 
         use_container_width=True,
-        column_config={col: st.column_config.TextColumn(label=f"**{col}**") for col in cột_yêu_cầu},
-        key="pro_editor_final"
+        key="pro_editor"
     )
 
-    # 3. XỬ LÝ TRỘN FILE VÀ XUẤT ZIP
-    if st.button("🚀 BẮT ĐẦU XUẤT HÀNG LOẠT (.ZIP)", use_container_width=True):
+    # Xử lý trộn file
+    if st.button("🚀 XUẤT HÀNG LOẠT (.ZIP)", use_container_width=True):
         if word_template and not edited_df.empty:
             try:
                 zip_buffer = BytesIO()
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     for index, row in edited_df.iterrows():
-                        # Đọc mẫu Word
                         doc = DocxTemplate(word_template)
                         context = row.to_dict()
                         
-                        # Tự động chuyển số tiền thành chữ cho các trường lương
+                        # Tự động thêm cột Số Tiền Chữ nếu có cột Luong hoặc LuongMoi
                         if "LuongMoi" in context and context["LuongMoi"]:
                             context["LuongMoiChu"] = doc_so_thanh_chu_logic(context["LuongMoi"])
-                        if "Luong" in context and context["Luong"]:
-                            context["LuongChu"] = doc_so_thanh_chu_logic(context["Luong"])
                         
-                        # Render dữ liệu vào Word
                         doc.render(context)
-                        
-                        # Lưu file vào bộ nhớ
                         out_word = BytesIO()
                         doc.save(out_word)
                         
-                        # Đặt tên file (Ưu tiên cột Ten, sau đó tới So)
-                        ten_file = str(row.get('Ten', row.get('So', f'Ho_So_{index+1}'))).strip().replace(' ', '_')
-                        zip_file.writestr(f"{ten_file}.docx", out_word.getvalue())
+                        # Tên file: ưu tiên cột Ten, nếu không có lấy So
+                        fname = str(row.get('Ten', row.get('So', f'File_{index}'))).replace(' ', '_')
+                        zip_file.writestr(f"{fname}.docx", out_word.getvalue())
                 
-                st.success(f"🎉 Chúc mừng! Đã tạo xong {len(edited_df)} tài liệu.")
-                st.download_button(
-                    "📥 TẢI TOÀN BỘ KẾT QUẢ (.ZIP)", 
-                    zip_buffer.getvalue(), 
-                    "Ket_Qua_Tron_Ho_So.zip", 
-                    "application/zip",
-                    use_container_width=True
-                )
+                st.success(f"✅ Đã xử lý {len(edited_df)} tài liệu!")
+                st.download_button("📥 TẢI KẾT QUẢ (.ZIP)", zip_buffer.getvalue(), "Ket_Qua.zip", "application/zip")
             except Exception as e:
-                st.error(f"❌ Có lỗi xảy ra: {e}")
+                st.error(f"❌ Lỗi: {e}")
         else:
-            st.warning("⚠️ Vui lòng tải file Word mẫu lên và nhập ít nhất một dòng dữ liệu vào bảng!")
+            st.warning("⚠️ Vui lòng cung cấp file Word mẫu và nhập ít nhất 1 dòng dữ liệu!")
 
 with tabs[3]: st.write("Chức năng đang phát triển...")
 with tabs[4]: st.write("Chức năng đang phát triển...")
