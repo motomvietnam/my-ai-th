@@ -64,7 +64,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Header
-st.title("🚀 Smart Tools Admin Dashboard")
+st.title("Smart Tools Admin Dashboard")
 st.write("Hệ sinh thái công cụ tự động hóa đa năng. Vui lòng chọn một công cụ bên dưới:")
 st.divider()
 
@@ -115,3 +115,4 @@ for i in range(0, 16, 4):
 # 6. Footer
 st.divider()
 st.caption("© 2026 Smart Tools Hub | Hỗ trợ: Zalo 0869611000")
+
