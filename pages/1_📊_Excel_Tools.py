@@ -168,40 +168,115 @@ def tạo_excel_mẫu():
 
 
 
-# --- TRONG PHẦN TAB 3 ---
+# --- HÀM TẠO FILE EXCEL MẪU ---
+def tạo_excel_mẫu():
+    # Danh sách các cột theo ảnh bạn gửi
+    cột_mẫu = [
+        "So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", 
+        "ThoiGian", "DiaDiem", "NgayCap", "LuongMoi", "LuongCu", 
+        "NgayHieuLuc", "MaNV", "Phongban"
+    ]
+    
+    # Dữ liệu mẫu ban đầu
+    data_mẫu = [
+        ["01", "Nguyễn Văn A", "Trưởng phòng", "20.000.000", "Lê Văn B", "Hội nghị khách hàng", 
+         "08:00 01/02/2026", "Hà Nội", "01/01/2026", "25.000.000", "20.000.000", 
+         "15/02/2026", "NV001", "Kinh doanh"]
+    ]
+    
+    df_mẫu = pd.DataFrame(data_mẫu, columns=cột_mẫu)
+    
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_mẫu.to_excel(writer, index=False, sheet_name='Mau_Nhap_Lieu')
+        # Định dạng một chút cho đẹp
+        workbook = writer.book
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#2ecc71', 'font_color': 'white', 'border': 1})
+        for col_num, value in enumerate(df_mẫu.columns.values):
+            writer.sheets['Mau_Nhap_Lieu'].write(0, col_num, value, header_fmt)
+            writer.sheets['Mau_Nhap_Lieu'].set_column(col_num, col_num, 15)
+            
+    return output.getvalue()
+
+# --- GIAO DIỆN TAB 3 ---
 with tabs[2]:
     st.header("🎭 Trộn Hồ Sơ & Hợp Đồng Chuyên Nghiệp")
     
-    # ... (giữ nguyên phần nút tải file mẫu và upload word mẫu) ...
-
-    st.write("📝 **Bảng nhập liệu (Chữ đen, dễ nhìn - Có thể dán từ Excel):**")
+    # Khu vực hướng dẫn & Tải mẫu
+    col_guide, col_download = st.columns([2, 1])
+    with col_guide:
+        st.markdown("""
+        **Quy trình sử dụng:**
+        1. Tải **File Excel Mẫu** về và điền thông tin (hoặc dán vào bảng dưới).
+        2. Tải **File Word Mẫu** lên (các từ khóa phải nằm trong `{{ }}`).
+        3. Nhấn **Xuất Zip** để nhận kết quả.
+        """)
     
-    # Khởi tạo danh sách cột chính xác theo yêu cầu
+    with col_download:
+        excel_mẫu = tạo_excel_mẫu()
+        st.download_button(
+            label="📥 TẢI FILE EXCEL MẪU",
+            data=excel_mẫu,
+            file_name="Mau_nhap_lieu_SmartTools.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+    st.divider()
+
+    # Khu vực nhập liệu chính
+    c1, c2 = st.columns(2)
+    with c1:
+        word_template = st.file_uploader("📂 Tải file Word mẫu", type=["docx"], key="w_tpl")
+    with c2:
+        st.info("💡 Bạn có thể dán (Ctrl+V) dữ liệu trực tiếp vào bảng phía dưới.")
+
+    # Khởi tạo bảng nhập liệu với đúng các cột yêu cầu
     cột_yêu_cầu = [
         "So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", 
         "ThoiGian", "DiaDiem", "NgayCap", "LuongMoi", "LuongCu", 
         "NgayHieuLuc", "MaNV", "Phongban"
     ]
     
-    # Cấu hình từng cột để hiện thị chữ màu đen và tiêu đề rõ ràng
-    config = {
-        col: st.column_config.TextColumn(
-            label=f"**{col}**", # Làm đậm tiêu đề bằng Markdown
-            help=f"Nhập dữ liệu cho {col}",
-            width="medium"
-        ) for col in cột_yêu_cầu
-    }
+    if 'df_merge' not in st.session_state:
+        st.session_state.df_merge = pd.DataFrame(columns=cột_yêu_cầu)
 
-    # Bảng nhập liệu với cấu hình màu sắc rõ nét
+    # Bảng nhập liệu thông minh (Data Editor)
     edited_df = st.data_editor(
         st.session_state.df_merge, 
         num_rows="dynamic", 
         use_container_width=True,
-        column_config=config, # Áp dụng cấu hình làm đậm tiêu đề
-        key="pro_editor_black_text"
+        key="pro_editor"
     )
 
-    # ... (giữ nguyên phần xử lý button xuất ZIP) ...
+    # Xử lý trộn file
+    if st.button("🚀 XUẤT HÀNG LOẠT (.ZIP)", use_container_width=True):
+        if word_template and not edited_df.empty:
+            try:
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                    for index, row in edited_df.iterrows():
+                        doc = DocxTemplate(word_template)
+                        context = row.to_dict()
+                        
+                        # Tự động thêm cột Số Tiền Chữ nếu có cột Luong hoặc LuongMoi
+                        if "LuongMoi" in context and context["LuongMoi"]:
+                            context["LuongMoiChu"] = doc_so_thanh_chu_logic(context["LuongMoi"])
+                        
+                        doc.render(context)
+                        out_word = BytesIO()
+                        doc.save(out_word)
+                        
+                        # Tên file: ưu tiên cột Ten, nếu không có lấy So
+                        fname = str(row.get('Ten', row.get('So', f'File_{index}'))).replace(' ', '_')
+                        zip_file.writestr(f"{fname}.docx", out_word.getvalue())
+                
+                st.success(f"✅ Đã xử lý {len(edited_df)} tài liệu!")
+                st.download_button("📥 TẢI KẾT QUẢ (.ZIP)", zip_buffer.getvalue(), "Ket_Qua.zip", "application/zip")
+            except Exception as e:
+                st.error(f"❌ Lỗi: {e}")
+        else:
+            st.warning("⚠️ Vui lòng cung cấp file Word mẫu và nhập ít nhất 1 dòng dữ liệu!")
 
 with tabs[3]: st.write("Chức năng đang phát triển...")
 with tabs[4]: st.write("Chức năng đang phát triển...")
