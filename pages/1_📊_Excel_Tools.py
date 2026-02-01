@@ -30,10 +30,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Kết nối AI từ Secrets
+# 2. Kết nối AI với xử lý lỗi NotFound
 if "GEMINI_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # SỬA LỖI: Sử dụng định danh đầy đủ 'models/gemini-1.5-flash'
+    try:
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
+    except Exception as e:
+        st.error(f"Lỗi khởi tạo Model: {e}")
+        st.stop()
 else:
     st.error("Chưa cấu hình API Key trong Secrets!")
     st.stop()
@@ -45,16 +50,20 @@ if st.sidebar.button("🏠 VỀ DASHBOARD TỔNG"):
 
 def read_file_content(uploaded_file):
     if uploaded_file is None: return ""
-    suffix = uploaded_file.name.split('.')[-1].lower()
-    if suffix == 'txt': return str(uploaded_file.read(), "utf-8")
-    elif suffix in ['doc', 'docx']:
-        doc = docx.Document(uploaded_file)
-        return "\n".join([para.text for para in doc.paragraphs])
-    elif suffix == 'pdf':
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        return "".join([page.extract_text() for page in pdf_reader.pages])
-    elif suffix in ['xlsx', 'xls']:
-        return pd.read_excel(uploaded_file).to_string()
+    try:
+        suffix = uploaded_file.name.split('.')[-1].lower()
+        if suffix == 'txt': 
+            return str(uploaded_file.read(), "utf-8")
+        elif suffix in ['doc', 'docx']:
+            doc = docx.Document(uploaded_file)
+            return "\n".join([para.text for para in doc.paragraphs])
+        elif suffix == 'pdf':
+            pdf_reader = PyPDF2.PdfReader(uploaded_file)
+            return "".join([page.extract_text() for page in pdf_reader.pages])
+        elif suffix in ['xlsx', 'xls']:
+            return pd.read_excel(uploaded_file).to_string()
+    except Exception as e:
+        return f"Lỗi đọc file: {e}"
     return ""
 
 def chuan_hoa_excel_pro(df):
@@ -86,39 +95,55 @@ def chuan_hoa_excel_pro(df):
     return output.getvalue()
 
 # --- GIAO DIỆN CHÍNH ---
-st.title("🚀 SMART TOOLS HUB - EXCEL PRO")
+st.title("🚀 SMART TOOLS HUB - PHIÊN BẢN CHUYÊN NGHIỆP")
 st.divider()
 
-tabs = st.tabs(["📊 Chuẩn hoá Excel", "🔍 So sánh văn bản", "👤 Tách Họ Tên", "💰 Đọc Số Tiền", "📧 Check Email"])
+tabs = st.tabs(["📊 Chuẩn hoá Excel", "🔍 So sánh tài liệu", "👤 Tách Họ Tên", "💰 Đọc Số Tiền", "📧 Check Email"])
 
-# TAB 1: CHUẨN HOÁ EXCEL
+# --- TAB 1: CHUẨN HOÁ EXCEL ---
 with tabs[0]:
     st.header("📊 Chuẩn hoá Dữ liệu Excel")
-    st.info("Chức năng: Sửa Họ tên, Ngày tháng, SĐT. Định dạng Font Arial + Kẻ bảng tự động.")
-    uploaded_file = st.file_uploader("Kéo và thả file Excel vào đây", type=["xlsx"], key="excel_main")
+    st.info("💡 Hệ thống tự động: Sửa Họ tên, Ngày tháng, Số điện thoại. Định dạng Font Arial + Bảng biểu.")
+    uploaded_file = st.file_uploader("Kéo thả file Excel tại đây", type=["xlsx"], key="excel_main")
     if uploaded_file:
         df = pd.read_excel(uploaded_file)
         st.dataframe(df.head(10), use_container_width=True)
         if st.button("✨ BẮT ĐẦU CHUẨN HOÁ", key="btn_excel"):
-            res = chuan_hoa_excel_pro(df)
-            st.success("✅ Đã hoàn thành!")
-            st.download_button("📥 TẢI FILE KẾT QUẢ", res, f"Cleaned_{uploaded_file.name}")
+            with st.spinner('Đang xử lý...'):
+                res = chuan_hoa_excel_pro(df)
+                st.success("✅ Thành công!")
+                st.download_button("📥 TẢI FILE KẾT QUẢ", res, f"Cleaned_{uploaded_file.name}")
 
-# TAB 2: SO SÁNH VĂN BẢN (PDF, DOC, EXCEL...)
+# --- TAB 2: SO SÁNH VĂN BẢN ---
 with tabs[1]:
-    st.header("🔍 So Sánh Tài Liệu Thông Minh")
-    st.info("So sánh nội dung giữa 2 file bất kỳ. AI sẽ chỉ ra các thay đổi.")
+    st.header("🔍 So Sánh Tài Liệu AI")
+    st.info("So sánh nội dung giữa 2 file: PDF, Word, Excel, Text. AI sẽ chỉ ra các thay đổi chính.")
     c1, c2 = st.columns(2)
     with c1: f_a = st.file_uploader("Tài liệu Gốc (A)", type=["pdf", "docx", "txt", "xlsx"], key="fa")
     with c2: f_b = st.file_uploader("Tài liệu Mới (B)", type=["pdf", "docx", "txt", "xlsx"], key="fb")
     
     if st.button("🚀 BẮT ĐẦU ĐỐI CHIẾU"):
         if f_a and f_b:
-            with st.spinner('AI đang phân tích...'):
-                t_a, t_b = read_file_content(f_a), read_file_content(f_b)
-                prompt = f"So sánh Bản A và Bản B. Liệt kê điểm khác biệt:\nBản A: {t_a[:2500]}\nBản B: {t_b[:2500]}"
-                st.markdown(model.generate_content(prompt).text)
+            with st.spinner('AI đang đọc và phân tích...'):
+                try:
+                    t_a = read_file_content(f_a)
+                    t_b = read_file_content(f_b)
+                    
+                    # Prompt tối ưu hóa để tránh lỗi token và NotFound
+                    prompt = f"""Bạn là một chuyên gia đối soát văn bản. Hãy liệt kê các điểm KHÁC BIỆT giữa Bản A và Bản B sau đây.
+                    Trình bày theo dạng danh sách gạch đầu dòng rõ ràng.
+                    
+                    Bản A: {t_a[:2000]}
+                    ---
+                    Bản B: {t_b[:2000]}"""
+                    
+                    response = model.generate_content(prompt)
+                    st.success("✅ Kết quả phân tích:")
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"❌ Lỗi AI: {e}")
+                    st.info("Gợi ý: Kiểm tra lại API Key hoặc giảm dung lượng file.")
         else:
-            st.warning("Vui lòng tải đủ 2 file!")
+            st.warning("Vui lòng tải lên cả 2 bản A và B để so sánh!")
 
-# (Các Tab 3, 4, 5 có thể thêm logic tương tự tùy nhu cầu)
+# (Giữ các Tab còn lại để dự phòng)
