@@ -44,7 +44,10 @@ def read_file_content(uploaded_file):
             return "\n".join([para.text for para in doc.paragraphs])
         elif suffix == 'pdf':
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
-            return "".join([page.extract_text() for page in pdf_reader.pages])
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+            return text
         elif suffix in ['xlsx', 'xls']:
             df = pd.read_excel(uploaded_file)
             return df.to_string()
@@ -93,8 +96,45 @@ with tabs[0]:
     file_ex = st.file_uploader("Kéo thả file Excel tại đây", type=["xlsx"], key="excel_tab")
     if file_ex:
         df = pd.read_excel(file_ex)
+        st.subheader("Dữ liệu gốc")
         st.dataframe(df.head(10), use_container_width=True)
-        if st.button("✨ BẮT ĐẦU CHUẨN HOÁ"):
-            res = chuan_hoa_excel_pro(df)
-            st.success("✅ Đã hoàn thành chuẩn hóa và định dạng!")
-            st.download_button("📥 TẢI FILE
+        if st.button("✨ BẮT ĐẦU CHUẨN HOÁ", key="btn_clean"):
+            with st.spinner("Đang xử lý..."):
+                res = chuan_hoa_excel_pro(df)
+                st.success("✅ Đã hoàn thành chuẩn hóa!")
+                st.download_button("📥 TẢI FILE EXCEL SẠCH", res, f"Cleaned_{file_ex.name}")
+
+# TAB 2: SO SÁNH VĂN BẢN (KHÔNG DÙNG AI)
+with tabs[1]:
+    st.header("🔍 Đối Soát Văn Bản Offline")
+    st.info("So sánh từng dòng giữa 2 file. Dòng xanh (+) là mới, dòng đỏ (-) là bị xóa.")
+    c1, c2 = st.columns(2)
+    with c1: f_a = st.file_uploader("Bản Gốc (A)", type=["pdf", "docx", "txt", "xlsx"], key="fa_pure")
+    with c2: f_b = st.file_uploader("Bản Mới (B)", type=["pdf", "docx", "txt", "xlsx"], key="fb_pure")
+    
+    if st.button("🚀 BẮT ĐẦU SO SÁNH", key="btn_compare"):
+        if f_a and f_b:
+            with st.spinner('Đang đối soát dữ liệu...'):
+                t_a = read_file_content(f_a)
+                t_b = read_file_content(f_b)
+                
+                diff = list(difflib.Differ().compare(t_a.splitlines(), t_b.splitlines()))
+                
+                st.subheader("Kết quả chi tiết:")
+                has_diff = False
+                for line in diff:
+                    if line.startswith('+ '):
+                        st.markdown(f"🟢 **Thêm:** `{line[2:]}`")
+                        has_diff = True
+                    elif line.startswith('- '):
+                        st.markdown(f"🔴 **Xóa:** ~~{line[2:]}~~")
+                        has_diff = True
+                
+                if not has_diff:
+                    st.success("✅ Hai tài liệu nội dung giống hệt nhau!")
+        else:
+            st.warning("Vui lòng tải đủ 2 bản A và B!")
+
+with tabs[2]: st.write("Chức năng đang phát triển...")
+with tabs[3]: st.write("Chức năng đang phát triển...")
+with tabs[4]: st.write("Chức năng đang phát triển...")
