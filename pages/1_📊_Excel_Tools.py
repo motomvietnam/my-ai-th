@@ -58,54 +58,78 @@ def read_file_content(uploaded_file):
     return ""
 def tao_file_word_mau_hop_dong():
     doc = Document()
-    # Thiết lập Font chữ
+    
+    # 1. Thiết lập Font chữ chuẩn (Times New Roman)
     style = doc.styles['Normal']
     style.font.name = 'Times New Roman'
-    style.font.size = Pt(12)
+    style.font.size = Pt(13) # Thường văn bản chính thức dùng 13pt
 
-    # Tiêu ngữ
+    # 2. Tiêu ngữ (Căn giữa, đậm)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n")
+    run = p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
     run.bold = True
-    run = p.add_run("Độc lập - Tự do - Hạnh phúc\n")
-    run.bold = True
-    p.add_run("---------------")
+    run.font.size = Pt(12)
+    
+    p2 = doc.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run2 = p2.add_run("Độc lập - Tự do - Hạnh phúc")
+    run2.bold = True
+    run2.font.size = Pt(13)
+    
+    p3 = doc.add_paragraph()
+    p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p3.add_run("---------------")
 
-    # Tên hợp đồng
+    # 3. Tên hợp đồng
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("\nHỢP ĐỒNG LAO ĐỘNG")
-    run.bold = True
-    run.font.size = Pt(16)
+    run_title = title.add_run("\nHỢP ĐỒNG LAO ĐỘNG")
+    run_title.bold = True
+    run_title.font.size = Pt(16)
 
-    # Nội dung
+    # 4. Nội dung (Sử dụng các biến khớp với bảng Excel của bạn)
     doc.add_paragraph(f"\nChúng tôi, một bên là Công ty: ").add_run("{{TenCongTy}}").bold = True
     doc.add_paragraph(f"Và một bên là Ông/Bà: ").add_run("{{Ten}}").bold = True
     
-    p = doc.add_paragraph("Mã nhân viên: ")
-    p.add_run("{{MaNV}}")
+    # Tạo danh sách thông tin gọn gàng
+    fields = [
+        ("Mã nhân viên:", "{{MaNV}}"),
+        ("Chức vụ:", "{{ChucVu}}"),
+        ("Mức lương chính thức:", "{{Luong}}"),
+        ("Đơn vị công tác:", "{{Phongban}}"),
+        ("Ngày có hiệu lực:", "{{NgayHieuLuc}}")
+    ]
     
-    p = doc.add_paragraph("Chức vụ: ")
-    p.add_run("{{ChucVu}}")
-    
-    p = doc.add_paragraph("Mức lương chính thức: ")
-    p.add_run("{{Luong}}")
-    
-    p = doc.add_paragraph("Đơn vị công tác: ")
-    p.add_run("{{Phongban}}")
-    
-    p = doc.add_paragraph("Ngày có hiệu lực: ")
-    p.add_run("{{NgayHieuLuc}}")
+    for label, placeholder in fields:
+        p = doc.add_paragraph()
+        p.add_run(f"- {label} ").bold = False
+        p.add_run(placeholder).bold = True
 
     doc.add_paragraph("\nCác điều khoản khác được thực hiện theo quy định của pháp luật lao động hiện hành.")
 
-    # Ký tên
+    # 5. Bảng ký tên (Căn chỉnh chuyên nghiệp)
     doc.add_paragraph("\n")
     table = doc.add_table(rows=1, cols=2)
-    table.cell(0,0).text = "NGƯỜI LAO ĐỘNG\n(Ký và ghi rõ họ tên)"
-    table.cell(0,1).text = "ĐẠI DIỆN CÔNG TY\n(Ký và đóng dấu)"
+    table.autofit = True
     
+    # Ô bên trái: Người lao động
+    cell_left = table.cell(0, 0)
+    p_left = cell_left.paragraphs[0]
+    p_left.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_l = p_left.add_run("NGƯỜI LAO ĐỘNG")
+    run_l.bold = True
+    p_left.add_run("\n(Ký và ghi rõ họ tên)")
+
+    # Ô bên phải: Đại diện công ty
+    cell_right = table.cell(0, 1)
+    p_right = cell_right.paragraphs[0]
+    p_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_r = p_right.add_run("ĐẠI DIỆN CÔNG TY")
+    run_r.bold = True
+    p_right.add_run("\n(Ký và đóng dấu)")
+    
+    # 6. Xuất file
     target_stream = BytesIO()
     doc.save(target_stream)
     return target_stream.getvalue()
