@@ -125,3 +125,81 @@ with tabs[0]:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
+# --- HÀM XỬ LÝ TÁCH ĐỊA CHỈ BẰNG AI ---
+def tach_dia_chi_bulk_ai(df, col_name):
+    """Sử dụng AI để tách địa chỉ từ một cột trong DataFrame"""
+    results = []
+    
+    # Chuẩn bị Prompt mẫu cho AI để đảm bảo đầu ra ổn định
+    sample_format = '[{"Số nhà/Đường": "...", "Phường/Xã": "...", "Quận/Huyện": "...", "Tỉnh/Thành phố": "..."}]'
+    
+    # Lặp qua từng dòng địa chỉ (Giới hạn 10-20 dòng mỗi lần để tránh quá tải API)
+    for addr in df[col_name]:
+        if pd.isnull(addr) or str(addr).strip() == "":
+            results.append({"Số nhà/Đường": "", "Phường/Xã": "", "Quận/Huyện": "", "Tỉnh/Thành phố": ""})
+            continue
+            
+        prompt = f"""
+        Phân tích địa chỉ Việt Nam sau: "{addr}"
+        Tách thành 4 cột: "Số nhà/Đường", "Phường/Xã", "Quận/Huyện", "Tỉnh/Thành phố".
+        Yêu cầu: 
+        1. Trả về duy nhất 1 dòng định dạng JSON đúng cấu trúc: {sample_format}
+        2. Nếu thông tin nào thiếu, hãy để trống "".
+        3. Phải chuẩn hoá tên riêng (Ví dụ: 'hcm' thành 'TP. Hồ Chí Minh').
+        """
+        
+        try:
+            response = model.generate_content(prompt)
+            # Làm sạch dữ liệu trả về để chỉ lấy phần JSON
+            json_str = re.search(r'\[.*\]', response.text, re.DOTALL).group()
+            item = pd.read_json(json_str).iloc[0].to_dict()
+            results.append(item)
+        except:
+            # Nếu AI lỗi, trả về dòng trống để không làm lệch hàng
+            results.append({"Số nhà/Đường": "Lỗi AI", "Phường/Xã": "", "Quận/Huyện": "", "Tỉnh/Thành phố": ""})
+            
+    # Chuyển kết quả thành DataFrame và nối vào DF gốc
+    df_addr = pd.DataFrame(results)
+    df_final = pd.concat([df.reset_index(drop=True), df_addr], axis=1)
+    
+    # Xuất file Excel định dạng chuyên nghiệp
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_final.to_excel(writer, index=False, sheet_name='Dia_Chi_Da_Tach')
+        workbook = writer.book
+        cell_fmt = workbook.add_format({'border': 1, 'font_name': 'Arial'})
+        for col_num, value in enumerate(df_final.columns.values):
+            writer.sheets['Dia_Chi_Da_Tach'].set_column(col_num, col_num, 25, cell_fmt)
+            
+    return output.getvalue(), df_final
+
+# --- GIAO DIỆN TAB 2 ---
+with tabs[1]:
+    st.header("📍 Tách Địa Chỉ Thông Minh (AI)")
+    st.info("💡 Chức năng: Tải lên file chứa cột địa chỉ viết liền, AI sẽ tự động tách thành Số nhà, Phường, Quận, Tỉnh.")
+    
+    file_addr = st.file_uploader("Tải lên file Excel chứa địa chỉ (.xlsx)", type=["xlsx"], key="addr_upload")
+    
+    if file_addr:
+        df_origin = pd.read_excel(file_addr)
+        st.write("Dữ liệu vừa tải lên:")
+        st.dataframe(df_origin.head(5))
+        
+        # Cho người dùng chọn cột chứa địa chỉ
+        column_to_process = st.selectbox("Chọn cột chứa địa chỉ cần tách:", df_origin.columns)
+        
+        if st.button("🚀 BẮT ĐẦU TÁCH ĐỊA CHỈ (AI)"):
+            with st.spinner('AI đang đọc và phân tích từng địa chỉ... (Vui lòng đợi)'):
+                # Xử lý
+                excel_data, df_preview = tach_dia_chi_bulk_ai(df_origin, column_to_process)
+                
+                st.success("✅ Đã tách xong địa chỉ trên cùng hàng!")
+                st.subheader("Kết quả sau khi tách:")
+                st.dataframe(df_preview.head(10))
+                
+                st.download_button(
+                    label="📥 TẢI FILE ĐỊA CHỈ ĐÃ CHỈNH SỬA",
+                    data=excel_data,
+                    file_name=f"Dia_Chi_Tach_{file_addr.name}",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
