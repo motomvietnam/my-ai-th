@@ -1,12 +1,63 @@
-
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import re
 from io import BytesIO
 
-# 1. Cấu hình ban đầu
+# 1. Cấu hình ban đầu & Giao diện đồng bộ
 st.set_page_config(page_title="Tinh chỉnh file excel", layout="wide")
+
+# --- CSS ĐỒNG BỘ GIAO DIỆN ---
+st.markdown("""
+    <style>
+    /* Nền tổng thể */
+    .stApp { background-color: #f1f5f9; }
+    
+    /* --- TÙY CHỈNH SIDEBAR BÊN TRÁI --- */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #745af2 0%, #01caf1 100%);
+    }
+    
+    /* Cỡ chữ, màu sắc và độ đậm của Menu Sidebar */
+    [data-testid="stSidebarNav"] ul li div a span {
+        color: white !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+    }
+    
+    /* Hiệu ứng khi di chuột qua menu bên trái */
+    [data-testid="stSidebarNav"] ul li div:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    /* Tùy chỉnh các nút bấm */
+    div.stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: 0.2s;
+        background-color: #745af2;
+        color: white;
+        border: none;
+    }
+    
+    div.stButton > button:hover {
+        background-color: #5a44c7;
+        color: white;
+        border: none;
+    }
+
+    /* Tab header chỉnh lại cho rõ ràng */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 18px;
+        font-weight: bold;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Nút quay lại Dashboard nhanh trên Sidebar
+if st.sidebar.button("🏠 VỀ DASHBOARD TỔNG"):
+    st.switch_page("app.py")
 
 # Kết nối AI
 if "GEMINI_KEY" in st.secrets:
@@ -29,11 +80,10 @@ def hieu_chinh_excel(df):
                 lambda x: " ".join(str(x).strip().title().split()) if pd.notnull(x) and str(x).strip() != "" else x
             )
         
-        # B. Chuẩn hóa Số điện thoại (ĐÃ FIX LỖI SỐ 0)
+        # B. Chuẩn hóa Số điện thoại
         elif any(keyword in col_lower for keyword in ['sđt', 'điện thoại', 'phone', 'tel']):
             def clean_p(p):
-                if pd.isnull(p) or str(p).strip() == "": return ""
-                # Chỉ giữ lại chữ số
+                if pd.isnull(p) or str(p).strip() == "" or str(p).lower() == "nan": return ""
                 n = re.sub(r'\D', '', str(p)) 
                 
                 if n.startswith('84'): 
@@ -41,12 +91,10 @@ def hieu_chinh_excel(df):
                 elif not n.startswith('0') and len(n) > 0:
                     n = '0' + n
                 
-                # Trả về chuỗi 10 số chuẩn nhất
                 if len(n) > 10: 
                     return n[-10:]
                 return n
             
-            # Ép kiểu sang string trước khi apply
             df_clean[col] = df_clean[col].astype(str).apply(clean_p)
             
         # C. Chuẩn hóa Ngày tháng
@@ -62,33 +110,25 @@ def hieu_chinh_excel(df):
         worksheet = writer.sheets['Data']
 
         fmt_header = workbook.add_format({'bold': True, 'bg_color': '#1e3a8a', 'font_color': 'white', 'border': 1, 'font_name': 'Arial', 'align': 'center'})
-        # Định dạng text_format để ép Excel giữ số 0
         text_format = workbook.add_format({'border': 1, 'font_name': 'Arial', 'num_format': '@'})
 
         for col_num, value in enumerate(df_clean.columns.values):
             worksheet.write(0, col_num, value, fmt_header)
             max_len = max(df_clean[value].astype(str).map(len).max(), len(value)) + 2
-            # Áp dụng text_format cho toàn bộ cột để không mất số 0
             worksheet.set_column(col_num, col_num, min(max_len, 50), text_format)
             
     return output.getvalue()
 
-# 3. Giao diện (Giữ nguyên phần UI của bạn)
+# 3. Giao diện Chính
 st.title("🚀 SMART TOOLS HUB")
+st.markdown("### Công cụ Hiệu chỉnh Dữ liệu & AI Marketing")
+st.divider()
+
 tab1, tab2 = st.tabs(["📊 Hiệu chỉnh Excel", "🤖 AI Content"])
 
 with tab1:
-    file = st.file_uploader("Tải file Excel", type=["xlsx"])
+    st.info("Tải file Excel (xlsx) để tự động sửa lỗi họ tên, thêm số 0 vào SĐT và định dạng ngày tháng.")
+    file = st.file_uploader("Chọn file Excel từ máy tính", type=["xlsx"])
     if file:
         df = pd.read_excel(file)
-        if st.button("✨ Thực hiện hiệu chỉnh"):
-            data = hieu_chinh_excel(df)
-            st.success("Đã bổ sung số 0 và chuẩn hóa dữ liệu!")
-            st.download_button("📥 TẢI FILE", data, f"Da_Sua_{file.name}")
-
-with tab2:
-    sp = st.text_input("Sản phẩm:")
-    if st.button("Viết bài"):
-        res = model.generate_content(f"Viết bài quảng cáo cho {sp}")
-        st.write(res.text)
-
+        st.dataframe
