@@ -5,6 +5,8 @@ from io import BytesIO
 import docx
 import PyPDF2
 import difflib
+import zipfile
+from docxtpl import DocxTemplate
 
 # 1. CẤU HÌNH GIAO DIỆN
 st.set_page_config(page_title="Smart Tools Hub - Pro", layout="wide")
@@ -16,7 +18,6 @@ st.markdown("""
     [data-testid="stSidebarNav"] ul li div a span { color: white !important; font-size: 18px !important; font-weight: bold !important; }
     div.stButton > button { border-radius: 8px; font-weight: 600; background-color: #745af2; color: white; border: none; width: 100%; }
 
-    /* KHUNG UPLOAD FILE MÀU XÁM NHẠT + CHỮ TRẮNG */
     [data-testid="stFileUploader"] {
         background-color: #bdc3c7 !important;
         border: 2px dashed #ffffff;
@@ -32,7 +33,7 @@ st.markdown("""
 if st.sidebar.button("🏠 VỀ DASHBOARD TỔNG"):
     st.switch_page("app.py")
 
-# --- HÀM XỬ LÝ ĐỌC FILE ---
+# --- CÁC HÀM HỖ TRỢ ---
 def read_file_content(uploaded_file):
     if uploaded_file is None: return ""
     try:
@@ -44,9 +45,7 @@ def read_file_content(uploaded_file):
             return "\n".join([para.text for para in doc.paragraphs])
         elif suffix == 'pdf':
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text()
+            text = "".join([page.extract_text() for page in pdf_reader.pages])
             return text
         elif suffix in ['xlsx', 'xls']:
             df = pd.read_excel(uploaded_file)
@@ -55,7 +54,6 @@ def read_file_content(uploaded_file):
         return f"Lỗi đọc file: {e}"
     return ""
 
-# --- HÀM CHUẨN HÓA EXCEL ---
 def chuan_hoa_excel_pro(df):
     df_clean = df.copy()
     for col in df_clean.columns:
@@ -88,53 +86,82 @@ def chuan_hoa_excel_pro(df):
 st.title("🚀 SMART TOOLS HUB - EXCEL & DOC PRO")
 st.divider()
 
-tabs = st.tabs(["📊 Chuẩn hoá Excel", "🔍 So sánh đối soát", "👤 Tách Họ Tên", "💰 Đọc Số Tiền", "📧 Check Email"])
+tabs = st.tabs(["📊 Chuẩn hoá Excel", "🔍 So sánh đối soát", "🎭 Mail Merge (Trộn file)", "💰 Đọc Số Tiền", "📧 Check Email"])
 
-# TAB 1: CHUẨN HÓA EXCEL
+# --- TAB 1: CHUẨN HÓA EXCEL ---
 with tabs[0]:
     st.header("📊 Chuẩn hoá Dữ liệu Excel")
     file_ex = st.file_uploader("Kéo thả file Excel tại đây", type=["xlsx"], key="excel_tab")
     if file_ex:
         df = pd.read_excel(file_ex)
-        st.subheader("Dữ liệu gốc")
         st.dataframe(df.head(10), use_container_width=True)
         if st.button("✨ BẮT ĐẦU CHUẨN HOÁ", key="btn_clean"):
             with st.spinner("Đang xử lý..."):
                 res = chuan_hoa_excel_pro(df)
-                st.success("✅ Đã hoàn thành chuẩn hóa!")
+                st.success("✅ Thành công!")
                 st.download_button("📥 TẢI FILE EXCEL SẠCH", res, f"Cleaned_{file_ex.name}")
 
-# TAB 2: SO SÁNH VĂN BẢN (KHÔNG DÙNG AI)
+# --- TAB 2: SO SÁNH VĂN BẢN ---
 with tabs[1]:
     st.header("🔍 Đối Soát Văn Bản Offline")
-    st.info("So sánh từng dòng giữa 2 file. Dòng xanh (+) là mới, dòng đỏ (-) là bị xóa.")
     c1, c2 = st.columns(2)
-    with c1: f_a = st.file_uploader("Bản Gốc (A)", type=["pdf", "docx", "txt", "xlsx"], key="fa_pure")
-    with c2: f_b = st.file_uploader("Bản Mới (B)", type=["pdf", "docx", "txt", "xlsx"], key="fb_pure")
+    with c1: f_a = st.file_uploader("Bản Gốc (A)", type=["pdf", "docx", "txt", "xlsx"], key="fa")
+    with c2: f_b = st.file_uploader("Bản Mới (B)", type=["pdf", "docx", "txt", "xlsx"], key="fb")
     
-    if st.button("🚀 BẮT ĐẦU SO SÁNH", key="btn_compare"):
+    if st.button("🚀 BẮT ĐẦU SO SÁNH"):
         if f_a and f_b:
-            with st.spinner('Đang đối soát dữ liệu...'):
-                t_a = read_file_content(f_a)
-                t_b = read_file_content(f_b)
-                
-                diff = list(difflib.Differ().compare(t_a.splitlines(), t_b.splitlines()))
-                
-                st.subheader("Kết quả chi tiết:")
-                has_diff = False
-                for line in diff:
-                    if line.startswith('+ '):
-                        st.markdown(f"🟢 **Thêm:** `{line[2:]}`")
-                        has_diff = True
-                    elif line.startswith('- '):
-                        st.markdown(f"🔴 **Xóa:** ~~{line[2:]}~~")
-                        has_diff = True
-                
-                if not has_diff:
-                    st.success("✅ Hai tài liệu nội dung giống hệt nhau!")
-        else:
-            st.warning("Vui lòng tải đủ 2 bản A và B!")
+            t_a, t_b = read_file_content(f_a), read_file_content(f_b)
+            diff = list(difflib.Differ().compare(t_a.splitlines(), t_b.splitlines()))
+            for line in diff:
+                if line.startswith('+ '): st.markdown(f"🟢 **Thêm:** `{line[2:]}`")
+                elif line.startswith('- '): st.markdown(f"🔴 **Xóa:** ~~{line[2:]}~~")
+        else: st.warning("Vui lòng tải đủ 2 bản!")
 
-with tabs[2]: st.write("Chức năng đang phát triển...")
+# --- TAB 3: MAIL MERGE (TÍNH NĂNG MỚI) ---
+with tabs[2]:
+    st.header("🎭 Trộn Hồ Sơ & Hợp Đồng Hàng Loạt")
+    st.markdown("""
+    **Cách dùng:** 1. Tải lên file Word mẫu có chứa các từ khóa nằm trong ngoặc nhọn kép, ví dụ: `{{Ten}}`, `{{Ngay}}`.
+    2. Dán hoặc sửa dữ liệu trong bảng bên dưới (Tiêu đề cột Excel phải khớp với từ khóa trong Word).
+    """)
+    
+    col_file, col_info = st.columns([1, 1])
+    with col_file:
+        word_template = st.file_uploader("1. Tải file Word mẫu (.docx)", type=["docx"], key="tpl_merge")
+    with col_info:
+        st.info("💡 Bạn có thể dán (Ctrl+V) dữ liệu từ Excel trực tiếp vào bảng bên dưới.")
+
+    # Bảng dữ liệu để khách hàng dán vào
+    if 'df_merge' not in st.session_state:
+        st.session_state.df_merge = pd.DataFrame(
+            [["Nguyễn Văn A", "Kế toán", "10,000,000"], ["Trần Thị B", "Nhân sự", "12,000,000"]],
+            columns=["Ten", "ChucVu", "Luong"]
+        )
+
+    edited_df = st.data_editor(st.session_state.df_merge, num_rows="dynamic", use_container_width=True)
+
+    if st.button("🚀 XUẤT ZIP HÀNG LOẠT", use_container_width=True):
+        if word_template:
+            try:
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                    for index, row in edited_df.iterrows():
+                        doc = DocxTemplate(word_template)
+                        context = row.to_dict()
+                        doc.render(context)
+                        out_word = BytesIO()
+                        doc.save(out_word)
+                        
+                        # Đặt tên file theo nội dung cột đầu tiên
+                        file_name = f"{str(row.iloc[0]).replace(' ', '_')}.docx"
+                        zip_file.writestr(file_name, out_word.getvalue())
+                
+                st.success(f"🎉 Đã tạo xong {len(edited_df)} file!")
+                st.download_button("📥 TẢI XUỐNG TẤT CẢ (.ZIP)", zip_buffer.getvalue(), "Ket_Qua_Merge.zip", "application/zip")
+            except Exception as e:
+                st.error(f"Lỗi: {e}")
+        else:
+            st.warning("Vui lòng tải file Word mẫu!")
+
 with tabs[3]: st.write("Chức năng đang phát triển...")
 with tabs[4]: st.write("Chức năng đang phát triển...")
