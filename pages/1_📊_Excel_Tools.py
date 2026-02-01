@@ -7,12 +7,40 @@ from io import BytesIO
 # 1. Cấu hình ban đầu & Giao diện đồng bộ
 st.set_page_config(page_title="Smart Tools Hub - Pro", layout="wide")
 
+# --- CSS ĐỒNG BỘ GIAO DIỆN & TÙY CHỈNH UPLOADER ---
 st.markdown("""
     <style>
     .stApp { background-color: #f1f5f9; }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #745af2 0%, #01caf1 100%); }
     [data-testid="stSidebarNav"] ul li div a span { color: white !important; font-size: 18px !important; font-weight: bold !important; }
+    
+    /* Nút bấm */
     div.stButton > button { border-radius: 8px; font-weight: 600; background-color: #745af2; color: white; border: none; width: 100%; }
+
+    /* --- TÙY CHỈNH PHẦN KÉO THẢ FILE (UPLOAD FILE) --- */
+    /* Màu nền xám nhạt cho khung uploader */
+    [data-testid="stFileUploader"] {
+        background-color: #e2e8f0; /* Màu xám nhạt hơn */
+        border-radius: 15px;
+        padding: 20px;
+    }
+
+    /* Màu chữ trắng cho các dòng thông báo trong khung */
+    [data-testid="stFileUploader"] section div div {
+        color: white !important;
+    }
+    
+    /* Màu icon đám mây */
+    [data-testid="stFileUploader"] svg {
+        fill: white !important;
+    }
+
+    /* Tùy chỉnh chữ trên nút Browse files */
+    [data-testid="stFileUploader"] button {
+        background-color: #745af2 !important;
+        color: white !important;
+    }
+
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p { font-size: 16px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
