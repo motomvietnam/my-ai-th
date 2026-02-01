@@ -16,8 +16,24 @@ from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
+from docx import Document as DocxDocument # Để tránh trùng tên nếu cần
 
-
+def gop_cac_file_word(list_docx_streams):
+    # Tạo một file word mới dựa trên file đầu tiên
+    merged_document = DocxDocument(BytesIO(list_docx_streams[0]))
+    
+    for i in range(1, len(list_docx_streams)):
+        # Thêm ngắt trang trước khi nối file tiếp theo
+        merged_document.add_page_break()
+        
+        # Đọc nội dung file tiếp theo
+        sub_doc = DocxDocument(BytesIO(list_docx_streams[i]))
+        for element in sub_doc.element.body:
+            merged_document.element.body.append(element)
+            
+    output = BytesIO()
+    merged_document.save(output)
+    return output.getvalue()
 def tao_file_word_mau_giay_moi():
     doc = Document()
     # ... code tạo giấy mời ...
