@@ -18,6 +18,20 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 from docx import Document as DocxDocument # Để tránh trùng tên nếu cần
 
+
+def gop_cac_file_word(list_docx_streams):
+    from docx import Document
+    # Khởi tạo document đầu tiên
+    merged_document = Document(BytesIO(list_docx_streams[0]))
+    for i in range(1, len(list_docx_streams)):
+        merged_document.add_page_break()
+        sub_doc = Document(BytesIO(list_docx_streams[i]))
+        for element in sub_doc.element.body:
+            merged_document.element.body.append(element)
+    output = BytesIO()
+    merged_document.save(output)
+    return output.getvalue()
+
 # --- KHỞI TẠO DỮ LIỆU GỐC ---
 cột_yêu_cầu = [
     "So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", 
@@ -343,85 +357,97 @@ def tạo_excel_mẫu():
 
 # --- GIAO DIỆN TAB 3: TRỘN HỒ SƠ & HỢP ĐỒNG ---
 with tabs[2]:
-    st.header("🎭 Trộn Hồ Sơ Chuyên Nghiệp (V5)")
+    st.header("🎭 Trộn Hồ Sơ & Hợp Đồng Chuyên Nghiệp")
     
-    # --- PHẦN 1: TẢI FILE ĐẦU VÀO ---
-    st.subheader("📁 Bước 1: Tải dữ liệu và Mẫu Word")
+    # 1. Khu vực Tải mẫu & Upload dữ liệu
+    st.subheader("📁 Bước 1: Tải file mẫu hoặc Upload file của bạn")
     col_upload_ex, col_upload_wd = st.columns(2)
     
     with col_upload_ex:
-        uploaded_excel = st.file_uploader("📂 Tải file Excel dữ liệu", type=["xlsx", "xls"])
-        st.download_button("📥 Tải Excel mẫu (nếu chưa có)", tạo_excel_mẫu(), "Mau_Excel.xlsx")
+        uploaded_excel = st.file_uploader("📂 Tải lên File Excel dữ liệu", type=["xlsx", "xls"], key="up_ex_v5")
+        st.download_button("📥 Tải Excel mẫu hệ thống", tạo_excel_mẫu(), "Mau_Excel.xlsx", use_container_width=True)
+        # Cập nhật session_state nếu có file excel tải lên
+        if uploaded_excel:
+            try:
+                st.session_state.df_merge = pd.read_excel(uploaded_excel)
+            except Exception as e:
+                st.error(f"Lỗi đọc Excel: {e}")
         
     with col_upload_wd:
-        uploaded_word = st.file_uploader("📂 Tải file Word mẫu ({{ }})", type=["docx"])
-        st.download_button("📥 Tải Word mẫu (nếu chưa có)", tao_file_word_mau_giay_moi(), "Mau_Giay_Moi.docx")
+        word_template = st.file_uploader("📂 Tải lên File Word mẫu (có {{ }})", type=["docx"], key="up_wd_v5")
+        st.download_button("📥 Tải Word mẫu hệ thống", tao_file_word_mau_giay_moi(), "Mau_Word.docx", use_container_width=True)
 
-    # Đọc dữ liệu từ Excel vào DataFrame nếu có file tải lên
-    if uploaded_excel:
-        st.session_state.df_merge = pd.read_excel(uploaded_excel)
-    
     st.divider()
 
-    # --- PHẦN 2: BẢNG CHỈNH SỬA DỮ LIỆU ---
-    st.subheader("📝 Bước 2: Kiểm tra & Chỉnh sửa dữ liệu")
-    st.write("*(Chữ đen đậm, bạn có thể sửa trực tiếp hoặc dán thêm dòng)*")
+    # 2. Bảng nhập liệu (Data Editor)
+    st.subheader("🚀 Bước 2: Kiểm tra & Nhập dữ liệu")
+    st.info("💡 Bạn có thể sửa trực tiếp hoặc dán (Ctrl+V) dữ liệu từ Excel vào bảng dưới.")
+
+    cột_yêu_cầu = ["So", "Ten", "ChucVu", "Luong", "TenKhach", "TenSuKien", "ThoiGian", "DiaDiem", "NgayCap", "LuongMoi", "LuongCu", "NgayHieuLuc", "MaNV", "Phongban"]
     
-    # Cấu hình bảng chữ đen đậm
-    config_cols = {col: st.column_config.TextColumn(label=f"**{col}**") for col in st.session_state.df_merge.columns}
-    
+    if 'df_merge' not in st.session_state or st.session_state.df_merge is None:
+        st.session_state.df_merge = pd.DataFrame(columns=cột_yêu_cầu)
+
+    # Cấu hình tiêu đề cột chữ đen đậm
+    config_cols = {col: st.column_config.TextColumn(label=f"**{col}**", width="medium") for col in st.session_state.df_merge.columns}
+
     edited_df = st.data_editor(
         st.session_state.df_merge, 
         num_rows="dynamic", 
         use_container_width=True,
         column_config=config_cols,
-        key="editor_v5"
+        key="pro_editor_v5"
     )
 
     st.divider()
 
-    # --- PHẦN 3: LỰA CHỌN XUẤT FILE ---
-    st.subheader("🚀 Bước 3: Lựa chọn kiểu xuất bản")
+    # 3. Lựa chọn kết xuất & Xử lý
+    st.subheader("📤 Bước 3: Lựa chọn hình thức xuất file")
     
-    if not edited_df.empty and uploaded_word:
-        mode = st.radio("Chọn hình thức kết xuất:", 
-                        ["📦 Xuất các file Word lẻ (Nén trong .ZIP)", 
-                         "📄 Gộp tất cả vào 1 file Word duy nhất"])
-        
-        if st.button("🔥 BẮT ĐẦU XỬ LÝ"):
-            all_docs = []
+    if word_template and not edited_df.empty:
+        xuat_kieu = st.radio(
+            "Bạn muốn nhận kết quả như thế nào?", 
+            ["📦 Các file Word lẻ (Nén trong .ZIP)", "📄 Gộp tất cả vào 1 file duy nhất"],
+            horizontal=True
+        )
+
+        if st.button("🚀 BẮT ĐẦU TRỘN DỮ LIỆU", use_container_width=True):
             try:
-                # Tiến hành trộn dữ liệu
+                all_docs = []
                 for index, row in edited_df.iterrows():
-                    doc = DocxTemplate(uploaded_word)
+                    doc = DocxTemplate(word_template)
                     context = row.to_dict()
                     
-                    # Logic đọc số tiền (nếu có)
-                    if "LuongMoi" in context: context["LuongMoiChu"] = doc_so_thanh_chu_logic(str(context["LuongMoi"]))
+                    # Logic đọc số tiền thành chữ
+                    if "LuongMoi" in context and pd.notnull(context["LuongMoi"]):
+                        context["LuongMoiChu"] = doc_so_thanh_chu_logic(str(context["LuongMoi"]))
+                    if "Luong" in context and pd.notnull(context["Luong"]):
+                        context["LuongChu"] = doc_so_thanh_chu_logic(str(context["Luong"]))
                     
                     doc.render(context)
                     out_word = BytesIO()
                     doc.save(out_word)
-                    all_docs.append({'data': out_word.getvalue(), 'name': str(row.get('Ten', f'File_{index+1}'))})
+                    
+                    fname = str(row.get('Ten', row.get('So', f'Ho_So_{index+1}'))).strip().replace(' ', '_')
+                    all_docs.append({"stream": out_word.getvalue(), "filename": f"{fname}.docx"})
 
                 # Trả kết quả theo lựa chọn
-                if "lẻ" in mode:
+                if "ZIP" in xuat_kieu:
                     zip_buffer = BytesIO()
                     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                        for d in all_docs:
-                            zip_file.writestr(f"{d['name'].replace(' ', '_')}.docx", d['data'])
-                    st.success("✅ Đã tạo xong bộ file lẻ!")
-                    st.download_button("📥 TẢI FILE .ZIP", zip_buffer.getvalue(), "Ket_Qua_Le.zip", use_container_width=True)
+                        for item in all_docs:
+                            zip_file.writestr(item["filename"], item["stream"])
+                    st.success(f"✅ Đã tạo thành công {len(all_docs)} file lẻ!")
+                    st.download_button("📥 TẢI XUỐNG FILE .ZIP", zip_buffer.getvalue(), "Ket_Qua_Le.zip", use_container_width=True)
                 
                 else:
-                    merged_data = gop_cac_file_word([d['data'] for d in all_docs])
-                    st.success("✅ Đã gộp thành công vào 1 file duy nhất!")
-                    st.download_button("📥 TẢI FILE WORD TỔNG", merged_data, "Ket_Qua_Tong_Hop.docx", use_container_width=True)
-                    
-            except Exception as e:
-                st.error(f"❌ Lỗi: {e}")
-    else:
-        st.warning("⚠️ Vui lòng tải đủ file Excel và Word để bắt đầu.")
+                    merged_data = gop_cac_file_word([item["stream"] for item in all_docs])
+                    st.success(f"✅ Đã gộp thành công {len(all_docs)} bản ghi vào 1 file tổng!")
+                    st.download_button("📥 TẢI XUỐNG FILE TỔNG", merged_data, "Ket_Qua_Tong_Hop.docx", use_container_width=True)
 
+            except Exception as e:
+                st.error(f"❌ Lỗi xử lý: {e}")
+    else:
+        st.warning("⚠️ Vui lòng tải lên File Word mẫu và nhập dữ liệu để bắt đầu.")
 with tabs[3]: st.write("Chức năng đang phát triển...")
 with tabs[4]: st.write("Chức năng đang phát triển...")
