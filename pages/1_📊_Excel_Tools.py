@@ -89,7 +89,7 @@ def read_file_content(uploaded_file):
     except Exception as e:
         return f"Lỗi đọc file: {e}"
     return ""
-    def tao_file_word_mau_giay_moi():
+def tao_file_word_mau_giay_moi():
     doc = Document()
     
     # Thiết lập Font chữ mặc định
