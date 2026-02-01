@@ -89,6 +89,61 @@ def read_file_content(uploaded_file):
     except Exception as e:
         return f"Lỗi đọc file: {e}"
     return ""
+    def tao_file_word_mau_giay_moi():
+    doc = Document()
+    
+    # Thiết lập Font chữ mặc định
+    style = doc.styles['Normal']
+    style.font.name = 'Arial'
+    style.font.size = Pt(12)
+
+    # 1. Tiêu ngữ
+    header = doc.add_paragraph()
+    header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = header.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n")
+    run.bold = True
+    run = header.add_run("Độc lập - Tự do - Hạnh phúc\n")
+    run.bold = True
+    header.add_run("----------o0o----------")
+
+    doc.add_paragraph("\n")
+
+    # 2. Tên giấy mời
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title.add_run("GIẤY MỜI THAM DỰ SỰ KIỆN")
+    run.bold = True
+    run.font.size = Pt(20)
+
+    doc.add_paragraph("\n")
+
+    # 3. Nội dung mời (Sử dụng các từ khóa {{ }})
+    content = doc.add_paragraph()
+    content.add_run("Trân trọng kính mời Ông/Bà: ").bold = True
+    content.add_run("{{TenKhach}}") # Từ khóa khớp với bảng của bạn
+    
+    doc.add_paragraph(f"Đến tham dự chương trình: ").add_run("{{TenSuKien}}").bold = True
+    
+    p = doc.add_paragraph("Thời gian: ")
+    p.add_run("{{ThoiGian}}")
+    
+    p = doc.add_paragraph("Địa điểm: ")
+    p.add_run("{{DiaDiem}}")
+    
+    doc.add_paragraph("\nNội dung sự kiện: Chương trình được tổ chức nhằm tri ân khách hàng và giới thiệu các tính năng mới của công ty.")
+    
+    # 4. Chữ ký
+    doc.add_paragraph("\n")
+    footer = doc.add_paragraph()
+    footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    footer.add_run("........, ngày .... tháng .... năm 2026\n").italic = True
+    run = footer.add_run("ĐẠI DIỆN BAN TỔ CHỨC")
+    run.bold = True
+    
+    # Lưu vào bộ nhớ tạm
+    target_stream = BytesIO()
+    doc.save(target_stream)
+    return target_stream.getvalue()
 def tao_file_word_mau_hop_dong():
     doc = Document()
     
